@@ -1,0 +1,23 @@
+# Fichiers sensibles
+.env
+.env.local
+.env.production
+
+# Données
+volumes/
+backups/
+local_files/
+
+# Logs
+*.log
+logs/
+
+# Certificats
+*.pem
+*.key
+*.crt
+
+# Temporaires
+.DS_Store
+Thumbs.db
+desktop.ini
