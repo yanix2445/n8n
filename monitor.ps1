@@ -1,45 +1,51 @@
 # Script de monitoring n8n - PowerShell
+# Surveillance des services et performances
 
-Write-Host "📊 État des services n8n" -ForegroundColor Cyan
-Write-Host "========================" -ForegroundColor Cyan
+Write-Host "📊 Monitoring n8n + PostgreSQL" -ForegroundColor Cyan
+Write-Host "================================" -ForegroundColor Cyan
 
 # État des conteneurs
-Write-Host "🐳 État des conteneurs:" -ForegroundColor Yellow
-docker-compose ps
+Write-Host "`n🐳 État des conteneurs:" -ForegroundColor Yellow
+docker-compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}"
 
-Write-Host ""
-Write-Host "💾 Utilisation des volumes:" -ForegroundColor Yellow
-if (Test-Path "volumes\n8n_data") {
-    $n8nSize = (Get-ChildItem "volumes\n8n_data" -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB
-    Write-Host "n8n_data: $([math]::Round($n8nSize, 2)) MB"
-}
-if (Test-Path "volumes\postgres_data") {
-    $pgSize = (Get-ChildItem "volumes\postgres_data" -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB
-    Write-Host "postgres_data: $([math]::Round($pgSize, 2)) MB"
-}
-if (Test-Path "backups") {
-    $backupSize = (Get-ChildItem "backups" -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB
-    Write-Host "backups: $([math]::Round($backupSize, 2)) MB"
+# Utilisation des ressources
+Write-Host "`n💻 Utilisation des ressources:" -ForegroundColor Yellow
+docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}"
+
+# Santé des services
+Write-Host "`n🏥 Santé des services:" -ForegroundColor Yellow
+Write-Host "n8n:" -NoNewline
+$n8nHealth = docker-compose exec -T n8n wget --spider -q http://localhost:5678/healthz 2>$null
+if ($LASTEXITCODE -eq 0) {
+    Write-Host " ✅ OK" -ForegroundColor Green
+} else {
+    Write-Host " ❌ ERROR" -ForegroundColor Red
 }
 
-Write-Host ""
-Write-Host "🔍 Logs récents (dernières 5 lignes):" -ForegroundColor Yellow
+Write-Host "PostgreSQL:" -NoNewline
+$pgHealth = docker-compose exec -T postgres pg_isready -q 2>$null
+if ($LASTEXITCODE -eq 0) {
+    Write-Host " ✅ OK" -ForegroundColor Green
+} else {
+    Write-Host " ❌ ERROR" -ForegroundColor Red
+}
+
+# Logs récents
+Write-Host "`n📋 Logs récents (5 dernières lignes):" -ForegroundColor Yellow
 Write-Host "--- n8n ---" -ForegroundColor White
 docker-compose logs --tail=5 n8n
 
-Write-Host ""
-Write-Host "--- PostgreSQL ---" -ForegroundColor White
+Write-Host "`n--- PostgreSQL ---" -ForegroundColor White
 docker-compose logs --tail=5 postgres
 
-Write-Host ""
-Write-Host "🌐 Services accessibles:" -ForegroundColor Yellow
-# Charger le port depuis .env
-$port = "2445"
-if (Test-Path ".env") {
-    $envContent = Get-Content ".env"
-    $portLine = $envContent | Where-Object { $_ -match "^N8N_PORT=(.*)$" }
-    if ($portLine) {
-        $port = $matches[1]
-    }
+# Informations d'accès
+Write-Host "`n🌐 Accès aux services:" -ForegroundColor Green
+Get-Content .env | Where-Object { $_ -match "^N8N_PORT=" } | ForEach-Object {
+    $port = ($_ -split "=")[1]
+    Write-Host "Interface n8n: http://localhost:$port" -ForegroundColor Green
 }
-Write-Host "n8n Interface: http://localhost:$port" -ForegroundColor Green
+
+Get-Content .env | Where-Object { $_ -match "^N8N_EDITOR_BASE_URL=" } | ForEach-Object {
+    $url = ($_ -split "=")[1]
+    Write-Host "URL externe: $url" -ForegroundColor Green
+}

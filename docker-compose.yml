@@ -1,143 +1,145 @@
-version: '3.8'
+# Docker Compose configuration pour n8n + PostgreSQL
+# Optimisé pour Windows 11 selon la documentation officielle n8n
 
 services:
   n8n:
-    image: n8nio/n8n:latest
+    image: docker.n8n.io/n8nio/n8n:latest
     container_name: n8n_app
     restart: unless-stopped
     
-    # Configuration des ports
     ports:
-      - "${N8N_PORT:-2445}:5678"
-
-    # Variables d'environnement
+      - "${N8N_PORT}:5678"
+    
     environment:
-      # Base de données
-      - DB_TYPE=postgresdb
+      # === CONFIGURATION BASE ===
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - NODE_ENV=production
+      - WEBHOOK_URL=${WEBHOOK_URL}
+      - N8N_EDITOR_BASE_URL=${N8N_EDITOR_BASE_URL}
+      
+      # === TIMEZONE ===
+      - GENERIC_TIMEZONE=${TIMEZONE}
+      - TZ=${TIMEZONE}
+      
+      # === AUTHENTIFICATION (obligatoire selon doc) ===
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
+      
+      # === SÉCURITÉ (variables recommandées doc) ===
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - N8N_SECURE_COOKIE=false
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      - N8N_BLOCK_FILE_ACCESS_TO_N8N_FILES=true
+      
+      # === BASE DE DONNÉES PostgreSQL (selon doc officielle) ===
+      - DB_TYPE=${DB_TYPE}
       - DB_POSTGRESDB_HOST=postgres
       - DB_POSTGRESDB_PORT=5432
       - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
       - DB_POSTGRESDB_USER=${POSTGRES_USER}
       - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_POSTGRESDB_SCHEMA=public
+      - DB_POSTGRESDB_POOL_SIZE=4
+      - DB_POSTGRESDB_CONNECTION_TIMEOUT=20000
+      - DB_POSTGRESDB_IDLE_CONNECTION_TIMEOUT=30000
       
-      # Configuration de base
-      - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
-      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
-      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
-      
-      # URLs configurables
-      - N8N_EDITOR_BASE_URL=${N8N_EDITOR_BASE_URL}
-      - WEBHOOK_URL=${WEBHOOK_URL}
-      
-      # Optimisations
+      # === STOCKAGE DES DONNÉES BINAIRES (recommandé doc) ===
       - N8N_DEFAULT_BINARY_DATA_MODE=filesystem
-      - N8N_COMMUNITY_PACKAGES_ALLOW_TOOL_USAGE=true
-      - N8N_TEMPLATES_ENABLED=true
-      - N8N_ONBOARDING_FLOW_DISABLED=false
-      - N8N_DIAGNOSTICS_ENABLED=false
-      - N8N_VERSION_NOTIFICATIONS_ENABLED=false
-      - N8N_SECURE_COOKIE=false
+      - N8N_BINARY_DATA_STORAGE_PATH=/home/node/.n8n/binaryData
       
-      # Performance
-      - EXECUTIONS_PROCESS=main
+      # === EXÉCUTIONS (configuration recommandée doc) ===
+      - EXECUTIONS_MODE=regular
       - EXECUTIONS_TIMEOUT=3600
       - EXECUTIONS_TIMEOUT_MAX=14400
       - EXECUTIONS_DATA_SAVE_ON_ERROR=all
       - EXECUTIONS_DATA_SAVE_ON_SUCCESS=all
+      - EXECUTIONS_DATA_SAVE_ON_PROGRESS=true
+      - EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS=true
       - EXECUTIONS_DATA_PRUNE=true
       - EXECUTIONS_DATA_MAX_AGE=336
+      - EXECUTIONS_DATA_PRUNE_MAX_COUNT=10000
       
-      # Timezone
-      - GENERIC_TIMEZONE=${TIMEZONE:-Europe/Paris}
-      - TZ=${TIMEZONE:-Europe/Paris}
+      # === FONCTIONNALITÉS UI (selon doc) ===
+      - N8N_TEMPLATES_ENABLED=true
+      - N8N_ONBOARDING_FLOW_DISABLED=false
+      - N8N_PERSONALIZATION_ENABLED=false
+      - N8N_WORKFLOW_TAGS_DISABLED=false
+      - WORKFLOWS_DEFAULT_NAME=My workflow
       
-    # Volumes
+      # === SÉCURITÉ PRODUCTION (recommandé doc) ===
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_VERSION_NOTIFICATIONS_ENABLED=false
+      - N8N_HIRING_BANNER_ENABLED=false
+      
+      # === COMMUNITY PACKAGES ===
+      - N8N_COMMUNITY_PACKAGES_ENABLED=true
+      
+      # === LOGS (configuration recommandée) ===
+      - N8N_LOG_LEVEL=info
+      - N8N_LOG_OUTPUT=console
+      - N8N_LOG_FORMAT=text
+      
+      # === PUBLIC API ===
+      - N8N_PUBLIC_API_DISABLED=false
+      - N8N_PUBLIC_API_ENDPOINT=api
+      - N8N_PUBLIC_API_SWAGGERUI_DISABLED=false
+      
+      # === PUSH BACKEND ===
+      - N8N_PUSH_BACKEND=websocket
+      
     volumes:
       - n8n_data:/home/node/.n8n
-      - ./local_files:/files:rw
-      - /etc/localtime:/etc/localtime:ro
+      - ./local_files:/files
     
-    # Health check
+    depends_on:
+      postgres:
+        condition: service_healthy
+    
+    networks:
+      - n8n_network
+    
+    # Health check pour n8n
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:5678/healthz || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
-    
-    # Limitations de ressources
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: '1.0'
-        reservations:
-          memory: 512M
-          cpus: '0.5'
-    
-    # Dépendances
-    depends_on:
-      postgres:
-        condition: service_healthy
-    
-    # Logging
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    
-    # Labels
-    labels:
-      - "traefik.enable=false"
-      - "com.docker.compose.project=n8n"
-      - "com.docker.compose.service=n8n"
-    
-    networks:
-      - n8n_network
+      start_period: 45s
 
   postgres:
-    image: postgres:17-alpine
+    image: postgres:15-alpine
     container_name: n8n_postgres
     restart: unless-stopped
     
-    # Variables d'environnement
     environment:
+      # Variables PostgreSQL standard
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_INITDB_ARGS="--encoding=UTF8 --lc-collate=C --lc-ctype=C"
+      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --auth-local=trust --auth-host=md5
+      
+      # Configuration optimisée
       - PGDATA=/var/lib/postgresql/data/pgdata
       
-    # Volumes
     volumes:
       - postgres_data:/var/lib/postgresql/data/pgdata
-      - ./postgres/init:/docker-entrypoint-initdb.d:ro
-      - /etc/localtime:/etc/localtime:ro
+      - ./postgres-init:/docker-entrypoint-initdb.d
     
-    # Health check
+    # Health check PostgreSQL (selon doc officielle)
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 15s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-n8n_user} -d ${POSTGRES_DB:-n8n}"]
+      interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
     
-    # Limitations de ressources
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: '0.5'
-        reservations:
-          memory: 256M
-          cpus: '0.25'
-    
-    # Configuration PostgreSQL
-    command: |
+    # Configuration PostgreSQL optimisée pour n8n
+    command: >
       postgres
-      -c max_connections=200
+      -c max_connections=100
       -c shared_buffers=128MB
       -c effective_cache_size=256MB
       -c maintenance_work_mem=64MB
@@ -148,56 +150,47 @@ services:
       -c effective_io_concurrency=200
       -c work_mem=4MB
       -c min_wal_size=1GB
-      -c max_wal_size=4GB
-      -c log_statement=none
-      -c log_duration=off
-      -c log_lock_waits=on
+      -c max_wal_size=2GB
       -c log_min_duration_statement=1000
-    
-    # Logging
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    
-    # Labels
-    labels:
-      - "com.docker.compose.project=n8n"
-      - "com.docker.compose.service=postgres"
+      -c log_checkpoints=on
+      -c log_connections=on
+      -c log_disconnections=on
+      -c log_lock_waits=on
     
     networks:
       - n8n_network
 
-  # Service optionnel de backup automatique
-  postgres_backup:
+  # Service de backup automatique (optionnel)
+  backup:
     image: postgres:17-alpine
-    container_name: n8n_postgres_backup
+    container_name: n8n_backup
     restart: unless-stopped
+    profiles:
+      - backup
     
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - PGHOST=postgres
-      - BACKUP_RETENTION_DAYS=7
+      - BACKUP_SCHEDULE=${BACKUP_SCHEDULE:-0 2 * * *}
+      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-7}
     
     volumes:
       - ./backups:/backups
-      - /etc/localtime:/etc/localtime:ro
+      - ./scripts/backup.sh:/backup.sh:ro
     
-    # Script de backup quotidien
-    command: |
+    command: >
       sh -c '
+        echo "Backup service démarré"
         while true; do
-          echo "Starting backup at $$(date)"
+          echo "Backup en cours à $$(date)"
           pg_dump -h postgres -U $$POSTGRES_USER -d $$POSTGRES_DB > /backups/n8n_backup_$$(date +%Y%m%d_%H%M%S).sql
-          echo "Backup completed at $$(date)"
           
           # Nettoyer les anciens backups
           find /backups -name "*.sql" -type f -mtime +$$BACKUP_RETENTION_DAYS -delete
           
-          # Attendre 24h
+          echo "Prochain backup dans 24h"
           sleep 86400
         done
       '
@@ -209,28 +202,18 @@ services:
     networks:
       - n8n_network
 
-# Volumes persistants
+# Volumes Docker gérés (recommandé pour Windows)
 volumes:
   n8n_data:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./volumes/n8n_data
+    name: n8n_data
   
   postgres_data:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./volumes/postgres_data
+    name: postgres_data
 
 # Réseau isolé
 networks:
   n8n_network:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16
-    driver_opts:
-      com.docker.network.bridge.name: n8n_bridge
+    name: n8n_network
