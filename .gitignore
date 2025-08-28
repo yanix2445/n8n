@@ -1,60 +1,163 @@
 # =============================================================================
-# 🔐 GITIGNORE - Protection des fichiers sensibles
+# 🔐 GITIGNORE - Projet Docker n8n avec PostgreSQL, Redis & Cloudflare Tunnel
 # =============================================================================
 #
-# Ce fichier empêche de commiter accidentellement des informations sensibles
+# Ce fichier protège les données sensibles et évite de commiter des fichiers inutiles
+# pour un projet d'automatisation n8n avec stack complète
 #
 
-# === FICHIERS SECRETS (TRÈS IMPORTANT) ==
-.env                    # Mots de passe, tokens, clés de chiffrement
+# =============================================================================
+# 🚨 FICHIERS SECRETS ET ENVIRONNEMENT (CRITIQUE)
+# =============================================================================
+.env
 .env.local
 .env.production
+.env.staging
+.env.development
 .env.backup
+.env.*
 
+# Tokens et credentials
+credentials/
+secrets/
+*.token
+cloudflare-*.json
 
-# === LOGS ET DONNÉES ===
-logs/
-*.log
+# =============================================================================
+# 📦 VOLUMES ET DONNÉES DOCKER
+# =============================================================================
+# Volumes Docker (données persistantes)
 n8n_data/
 postgres_data/
 redis_data/
-backups/
-*.sql
-*.tar.gz
+n8n_logs/
 
-# === FICHIERS TEMPORAIRES ===
-.DS_Store
-Thumbs.db
-*.tmp
-*.temp
+# Dossiers de données locales
+data/
+volumes/
+backups/
+exports/
+
+# Fichiers de sauvegarde base de données
+*.sql
+*.dump
+*.bak
+*.backup
+
+# =============================================================================
+# 📄 LOGS ET MONITORING
+# =============================================================================
+# Logs n8n et services
+logs/
+*.log
+n8n.log
+postgres.log
+redis.log
+cloudflared.log
+
+# Logs Docker
+docker-compose.*.log
+container-*.log
+
+# =============================================================================
+# 🛠️ FICHIERS DE DÉVELOPPEMENT
+# =============================================================================
+# IDEs et éditeurs
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
-# === CERTIFICATS ET CLÉS ===
-*.pem
-*.key
-*.crt
-*.p12
-*.pfx
-credentials/
+# Fichiers temporaires
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
 
-# === VOLUMES DOCKER LOCAUX ===
-volumes/
-data/
-
-# === FICHIERS DE DÉVELOPPEMENT ===
+# Tests et debugging
 debug.log
 test-results/
 coverage/
-
-# === FICHIERS SYSTÈME ===
-.git/
-node_modules/
-npm-debug.log*
+*.test.log
 
 # =============================================================================
-# ⚠️  RAPPEL SÉCURITÉ :
-# - Ne commitez JAMAIS le fichier .env
-# - Gardez vos tokens Cloudflare secrets
-# - Sauvegardez votre clé N8N_ENCRYPTION_KEY en lieu sûr
+# 🔧 CERTIFICATS ET SÉCURITÉ
+# =============================================================================
+# Certificats SSL/TLS
+*.pem
+*.key
+*.crt
+*.csr
+*.p12
+*.pfx
+*.cer
+
+# Clés SSH et GPG
+id_rsa*
+id_ed25519*
+*.pub
+*.gpg
+
+# =============================================================================
+# 📋 FICHIERS SYSTÈME ET CACHE
+# =============================================================================
+# Système Windows
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# Système macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Système Linux
+.Trash-*
+
+# Cache et temporaires
+.cache/
+tmp/
+temp/
+
+# =============================================================================
+# 📦 NODE.JS ET PACKAGE MANAGERS (si utilisés pour scripts)
+# =============================================================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn/
+.pnpm-debug.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# =============================================================================
+# 🐳 DOCKER SPÉCIFIQUE
+# =============================================================================
+# Images et conteneurs locaux (si build custom)
+*.tar
+docker-compose.override.yml
+
+# =============================================================================
+# 🔄 FICHIERS DE WORKFLOW N8N
+# =============================================================================
+# Backups automatiques n8n (si configurés)
+n8n-backup-*.json
+workflows-export-*.json
+
+# Fichiers temporaires n8n
+files/*.tmp
+files/temp/
+
+# =============================================================================
+# ⚠️  RAPPEL SÉCURITÉ POUR PROJET N8N :
+# =============================================================================
+# 1. 🚨 JAMAIS de .env dans Git (contient tokens Cloudflare, passwords DB)
+# 2. 🔐 N8N_ENCRYPTION_KEY = secret critique (workflows chiffrés)
+# 3. 🗄️ Postgres credentials = accès base de données
+# 4. ☁️  CLOUDFLARE_TUNNEL_TOKEN = accès tunnel sécurisé
+# 5. 📧 Tokens API (Telegram, email, etc.) dans workflows n8n
 # =============================================================================

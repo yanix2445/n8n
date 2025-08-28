@@ -54,10 +54,15 @@ Configuration Docker Compose **avancée** pour héberger n8n avec de bonnes perf
 2. **Allez dans "Zero Trust" > "Networks" > "Tunnels"**
 3. **Créez un nouveau tunnel** (nom : n8n)
 4. **Configurez le tunnel :**
-   - Type : `HTTPS`
-   - URL : `http://n8n:5678` ⚠️ (pas localhost !)
+   - Type : `HTTP` (pas HTTPS)
+   - URL : `http://localhost:5678`
    - Domaine : `votre-domaine.com`
 5. **Copiez le token généré** (commence par `eyJ...`)
+
+**🔧 Configuration webhook pour Telegram :**
+- Le tunnel doit pointer vers `localhost:5678`
+- n8n est configuré pour générer des URLs sans port (port 443 implicite)
+- Cela résout les problèmes de webhooks Telegram (ports autorisés: 80, 88, 443, 8443)
 
 ### ÉTAPE 2 : Configuration du Projet
 
@@ -81,7 +86,6 @@ N8N_ENCRYPTION_KEY=c87c981aecc82232ca61bd22d31e0104da3359a0b0a47356d7d8ad4fd6fcd
 CLOUDFLARE_TUNNEL_TOKEN=eyJ... (votre token)
 CLOUDFLARE_DOMAIN=votre-domaine.com
 WEBHOOK_URL=https://votre-domaine.com
-N8N_EDITOR_BASE_URL=https://votre-domaine.com
 
 # Autres configurations
 TIMEZONE=Europe/Paris
@@ -128,16 +132,34 @@ docker-compose ps
 
 Ce projet inclut des scripts avancés optimisés pour chaque système :
 
-### 📁 Fichiers de Scripts
+### 📁 Structure du Projet
 
 ```
-🖥️  Windows:
-   ├── start.ps1     - PowerShell 7 moderne (couleurs, animations, gestion d'erreurs)
-   └── start.bat     - Batch classique (compatibilité)
-
-🍎 macOS/Linux:
-   └── start.sh      - Bash universel fun (macOS & Linux, couleurs, spinners)
+n8n_11_07_2025/
+├── 📄 docker-compose.yml    - Configuration complète (6 services)
+├── 📄 .gitignore            - Protection des fichiers sensibles
+├── 📄 README.md             - Documentation (ce fichier)
+├── 📁 files/                - Dossier partagé avec n8n
+├── 🖥️  start.ps1             - Script PowerShell 7 (Windows)
+├── 🖥️  start.bat             - Script Batch classique (Windows)
+└── 🍎 start.sh              - Script Bash universel (macOS/Linux)
 ```
+
+### 🎯 Configuration Actuelle
+
+**Services déployés :**
+- **PostgreSQL 15** : Base de données production
+- **Redis 7** : Queue haute performance
+- **n8n latest** : Application principale
+- **n8n-worker** : Traitement parallèle
+- **Cloudflare Tunnel** : Accès HTTPS sécurisé
+
+**Optimisations appliquées :**
+- ✅ **Webhooks** : Configuration port 443 compatible
+- ✅ **Resource limits** : Protection système (CPU/RAM)
+- ✅ **Health checks** : Surveillance automatique
+- ✅ **Queue system** : 10 workflows simultanés
+- ✅ **Logs structurés** : Débogage facilité
 
 ### ✨ Fonctionnalités des Scripts Modernes
 
@@ -151,7 +173,7 @@ Ce projet inclut des scripts avancés optimisés pour chaque système :
 
 **Bash Universel (start.sh) :**
 - 🌈 Couleurs adaptatives selon le terminal (8/256 couleurs)
-- 🚀 Spinners et animations fluides 
+- 🚀 Spinners et animations fluides
 - 🔧 Détection automatique macOS/Linux/distributions
 - 📊 Barres de progression pour chaque service
 - 🎯 Détection Docker Compose V1/V2 automatique
@@ -169,7 +191,7 @@ Ce projet inclut des scripts avancés optimisés pour chaque système :
 # macOS - Terminal Bash/Zsh
 ./start.sh
 
-# Linux - Bash universel  
+# Linux - Bash universel
 ./start.sh
 
 # Fallback manuel
@@ -327,6 +349,17 @@ docker-compose up -d --scale n8n-worker=5 n8n-worker
 ## 🔍 Dépannage (Troubleshooting)
 
 ### Problèmes Courants
+
+**❌ Erreur Telegram Webhook "bad webhook: ports 80, 88, 443, 8443"**
+```bash
+# Vérifiez la configuration webhook dans docker-compose.yml
+docker-compose logs n8n | grep -i webhook
+
+# La configuration actuelle utilise :
+# - N8N_PORT=5678 (interne)
+# - WEBHOOK_URL=https://votre-domaine.com (sans port = 443 implicite)
+# - Tunnel Cloudflare: localhost:5678 → https://domaine.com
+```
 
 **❌ n8n ne démarre pas**
 ```bash
