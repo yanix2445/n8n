@@ -1,219 +1,417 @@
-# Docker Compose configuration pour n8n + PostgreSQL
-# Optimisé pour Windows 11 selon la documentation officielle n8n
+# =============================================================================
+# 🐳 DOCKER COMPOSE - Configuration complète pour n8n + PostgreSQL + Cloudflare
+# =============================================================================
+#
+# Ce fichier définit 3 services qui vont tourner ensemble :
+# 1. PostgreSQL = Base de données pour stocker les workflows n8n
+# 2. n8n = L'application d'automatisation principale  
+# 3. cloudflared = Tunnel Cloudflare pour accès HTTPS depuis internet
+#
+# 📖 COMMANDES UTILES :
+# docker-compose up -d          → Démarre tous les services en arrière-plan
+# docker-compose down           → Arrête et supprime tous les conteneurs
+# docker-compose logs           → Voir les logs de tous les services
+# docker-compose logs postgres  → Voir les logs d'un service spécifique
+# docker-compose ps             → Voir l'état des services
+# =============================================================================
 
+# SERVICES = Nos différents conteneurs qui vont tourner
 services:
-  n8n:
-    image: docker.n8n.io/n8nio/n8n:latest
-    container_name: n8n_app
+
+  # ==========================================================================
+  # 🗄️ SERVICE 1: POSTGRESQL - Base de données
+  # ==========================================================================
+  #
+  # PostgreSQL va stocker :
+  # - Les workflows n8n que vous créez
+  # - L'historique des exécutions 
+  # - Les paramètres et configurations
+  #
+  postgres:
+    # IMAGE = Quelle version de PostgreSQL utiliser
+    # "15-alpine" = Version 15 + Alpine Linux (plus léger)
+    image: postgres:15-alpine
+    
+    # CONTAINER_NAME = Nom du conteneur (optionnel mais pratique)
+    container_name: n8n_postgres
+    
+    # RESTART = Que faire si le conteneur s'arrête ?
+    # "unless-stopped" = Redémarre automatiquement sauf si on l'arrête manuellement
     restart: unless-stopped
     
-    ports:
-      - "${N8N_PORT}:5678"
-    
+    # ENVIRONMENT = Variables d'environnement pour configurer PostgreSQL
     environment:
-      # === CONFIGURATION BASE ===
-      - N8N_HOST=0.0.0.0
-      - N8N_PORT=5678
-      - N8N_PROTOCOL=http
-      - NODE_ENV=production
-      - WEBHOOK_URL=${WEBHOOK_URL}
-      - N8N_EDITOR_BASE_URL=${N8N_EDITOR_BASE_URL}
+      # Nom de la base de données à créer automatiquement
+      - POSTGRES_DB=${POSTGRES_DB}
       
-      # === TIMEZONE ===
-      - GENERIC_TIMEZONE=${TIMEZONE}
-      - TZ=${TIMEZONE}
+      # Nom d'utilisateur pour la base
+      - POSTGRES_USER=${POSTGRES_USER}
       
-      # === AUTHENTIFICATION (obligatoire selon doc) ===
-      - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
-      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
+      # Mot de passe sécurisé depuis le fichier .env
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       
-      # === SÉCURITÉ (variables recommandées doc) ===
-      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
-      - N8N_SECURE_COOKIE=false
-      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
-      - N8N_BLOCK_FILE_ACCESS_TO_N8N_FILES=true
-      
-      # === BASE DE DONNÉES PostgreSQL (selon doc officielle) ===
-      - DB_TYPE=${DB_TYPE}
-      - DB_POSTGRESDB_HOST=postgres
-      - DB_POSTGRESDB_PORT=5432
-      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
-      - DB_POSTGRESDB_USER=${POSTGRES_USER}
-      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
-      - DB_POSTGRESDB_SCHEMA=public
-      - DB_POSTGRESDB_POOL_SIZE=4
-      - DB_POSTGRESDB_CONNECTION_TIMEOUT=20000
-      - DB_POSTGRESDB_IDLE_CONNECTION_TIMEOUT=30000
-      
-      # === STOCKAGE DES DONNÉES BINAIRES (recommandé doc) ===
-      - N8N_DEFAULT_BINARY_DATA_MODE=filesystem
-      - N8N_BINARY_DATA_STORAGE_PATH=/home/node/.n8n/binaryData
-      
-      # === EXÉCUTIONS (configuration recommandée doc) ===
-      - EXECUTIONS_MODE=regular
-      - EXECUTIONS_TIMEOUT=3600
-      - EXECUTIONS_TIMEOUT_MAX=14400
-      - EXECUTIONS_DATA_SAVE_ON_ERROR=all
-      - EXECUTIONS_DATA_SAVE_ON_SUCCESS=all
-      - EXECUTIONS_DATA_SAVE_ON_PROGRESS=true
-      - EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS=true
-      - EXECUTIONS_DATA_PRUNE=true
-      - EXECUTIONS_DATA_MAX_AGE=336
-      - EXECUTIONS_DATA_PRUNE_MAX_COUNT=10000
-      
-      # === FONCTIONNALITÉS UI (selon doc) ===
-      - N8N_TEMPLATES_ENABLED=true
-      - N8N_ONBOARDING_FLOW_DISABLED=false
-      - N8N_PERSONALIZATION_ENABLED=false
-      - N8N_WORKFLOW_TAGS_DISABLED=false
-      - WORKFLOWS_DEFAULT_NAME=My workflow
-      
-      # === SÉCURITÉ PRODUCTION (recommandé doc) ===
-      - N8N_DIAGNOSTICS_ENABLED=false
-      - N8N_VERSION_NOTIFICATIONS_ENABLED=false
-      - N8N_HIRING_BANNER_ENABLED=false
-      
-      # === COMMUNITY PACKAGES ===
-      - N8N_COMMUNITY_PACKAGES_ENABLED=true
-      
-      # === LOGS (configuration recommandée) ===
-      - N8N_LOG_LEVEL=info
-      - N8N_LOG_OUTPUT=console
-      - N8N_LOG_FORMAT=text
-      
-      # === PUBLIC API ===
-      - N8N_PUBLIC_API_DISABLED=false
-      - N8N_PUBLIC_API_ENDPOINT=api
-      - N8N_PUBLIC_API_SWAGGERUI_DISABLED=false
-      
-      # === PUSH BACKEND ===
-      - N8N_PUSH_BACKEND=websocket
-      
+      # Options d'initialisation
+      - POSTGRES_INITDB_ARGS=--encoding=UTF8
+    
+    # VOLUMES = Stockage persistant des données
+    # Format: nom_du_volume:chemin_dans_le_conteneur
     volumes:
-      - n8n_data:/home/node/.n8n
-      - ./local_files:/files
+      # Les données PostgreSQL seront stockées dans le volume "postgres_data"
+      # Même si on supprime le conteneur, les données restent !
+      - postgres_data:/var/lib/postgresql/data
     
-    depends_on:
-      postgres:
-        condition: service_healthy
+    # HEALTHCHECK = Vérifier que PostgreSQL fonctionne bien
+    # Docker va tester si la base répond toutes les 10 secondes
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U n8n_user -d n8n_database"]
+      interval: 10s    # Teste toutes les 10 secondes
+      timeout: 5s      # Attend 5 secondes maximum pour une réponse
+      retries: 5       # Essaie 5 fois avant de déclarer le service "unhealthy"
+      start_period: 30s # Attend 30s avant de commencer les tests
     
+    # NETWORKS = Dans quel réseau ce conteneur va communiquer
     networks:
       - n8n_network
+
+  # ==========================================================================
+  # 🤖 SERVICE 2: N8N - Application d'automatisation
+  # ==========================================================================
+  #
+  # n8n est l'application principale qui permet de :
+  # - Créer des workflows d'automatisation
+  # - Connecter différentes applications (Google Sheets, Slack, etc.)
+  # - Exécuter des tâches automatiquement
+  #
+  n8n:
+    # IMAGE = Version officielle de n8n
+    image: docker.n8n.io/n8nio/n8n:latest
     
-    # Health check pour n8n
+    # NOM du conteneur
+    container_name: n8n_app
+    
+    # Redémarrage automatique
+    restart: unless-stopped
+    
+    # PORTS = Rendre n8n accessible depuis votre PC
+    # Format: port_sur_votre_pc:port_dans_le_conteneur
+    ports:
+      - "5678:5678"  # n8n sera accessible sur http://localhost:5678
+    
+    # VARIABLES D'ENVIRONNEMENT = Configuration de n8n
+    environment:
+      # === CONFIGURATION DE BASE ===
+      - N8N_HOST=0.0.0.0              # Écoute sur toutes les interfaces
+      - N8N_PORT=5678                  # Port interne de n8n
+      - N8N_PROTOCOL=http              # HTTP pour l'instant (HTTPS avec Cloudflare)
+      - NODE_ENV=production            # Mode production
+      
+      # === PERFORMANCE & SCALABILITÉ (2024/2025) ===
+      - N8N_DEFAULT_BINARY_DATA_MODE=filesystem  # Stockage optimisé des fichiers
+      - EXECUTIONS_MODE=queue          # Mode queue pour haute performance
+      - QUEUE_BULL_REDIS_HOST=redis    # Redis pour la queue (ajoutera service Redis)
+      - QUEUE_BULL_REDIS_PORT=6379     # Port Redis standard
+      - EXECUTIONS_PROCESS=main        # Processus principal pour les exécutions
+      
+      # === CONCURRENCE ET LIMITES ===
+      - N8N_CONCURRENCY_PRODUCTION=10 # 10 workflows simultanés max
+      - EXECUTIONS_DATA_MAX_AGE=168    # Garde les exécutions 7 jours (168h)
+      - EXECUTIONS_DATA_PRUNE=true     # Nettoyage automatique
+      - EXECUTIONS_DATA_PRUNE_MAX_COUNT=10000  # Max 10k exécutions stockées
+      
+      # === CONNEXION À LA BASE DE DONNÉES ===
+      - DB_TYPE=postgresdb             # Utilise PostgreSQL
+      - DB_POSTGRESDB_HOST=postgres    # Nom du service PostgreSQL (pas l'IP !)
+      - DB_POSTGRESDB_PORT=5432        # Port standard PostgreSQL
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}  # Nom de la base (même que dans postgres)
+      - DB_POSTGRESDB_USER=${POSTGRES_USER}    # Utilisateur (même que dans postgres)
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}  # Mot de passe (même que postgres)
+      
+      # === SÉCURITÉ ===
+      - N8N_BASIC_AUTH_ACTIVE=true     # Active l'authentification
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}      # Nom d'utilisateur pour se connecter
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}  # Mot de passe sécurisé
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}  # Clé pour chiffrer les données sensibles
+      - N8N_SECURE_COOKIE=true         # Cookies sécurisés (HTTPS)
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=true  # Bloque l'accès aux variables d'env dans les nodes
+      
+      # === LOGGING & MONITORING (Production 2024/2025) ===
+      - N8N_LOG_LEVEL=info             # Niveau de log optimal pour production
+      - N8N_LOG_OUTPUT=console,file    # Logs dans console ET fichier
+      - N8N_LOG_FILE_LOCATION=/home/node/.n8n/logs/  # Dossier des logs
+      - N8N_METRICS_ENABLE=true        # Active les métriques (si supporté)
+      
+      # === TIMEZONE ===
+      - GENERIC_TIMEZONE=${TIMEZONE}  # Fuseau horaire depuis .env
+      - TZ=${TIMEZONE}
+      
+      # === FEATURES AVANCÉES 2024/2025 ===
+      - N8N_TEMPLATES_ENABLED=true     # Active les templates
+      - N8N_ONBOARDING_FLOW_DISABLED=true  # Désactive l'onboarding en production
+      - N8N_PERSONALIZATION_ENABLED=false  # Désactive tracking perso en production
+      - N8N_VERSION_NOTIFICATIONS_ENABLED=false  # Pas de notifs de version
+      - N8N_HIRING_BANNER_ENABLED=false    # Pas de bannière de recrutement
+    
+    # VOLUMES = Stockage des données n8n
+    volumes:
+      # Stockage des workflows, paramètres, fichiers
+      - n8n_data:/home/node/.n8n
+      
+      # Dossier pour partager des fichiers avec n8n
+      - ./files:/files
+      
+      # Volume pour les logs (nouveau 2024/2025)
+      - n8n_logs:/home/node/.n8n/logs
+    
+    # RESOURCE LIMITS = Limites CPU/RAM (Production 2024/2025)
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'        # Max 2 CPU cores
+          memory: 2G         # Max 2GB RAM
+        reservations:
+          cpus: '0.5'        # Reserve 0.5 CPU
+          memory: 512M       # Reserve 512MB RAM
+    
+    # DEPENDS_ON = n8n ne démarre QUE si PostgreSQL et Redis sont en bonne santé
+    depends_on:
+      postgres:
+        condition: service_healthy  # Attend que le healthcheck de postgres passe
+      redis:
+        condition: service_healthy  # Attend que Redis soit prêt
+    
+    # HEALTHCHECK = Vérifier que n8n répond
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:5678/healthz || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 45s
-
-  postgres:
-    image: postgres:15-alpine
-    container_name: n8n_postgres
-    restart: unless-stopped
+      start_period: 60s  # n8n met plus de temps à démarrer
     
-    environment:
-      # Variables PostgreSQL standard
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --auth-local=trust --auth-host=md5
-      
-      # Configuration optimisée
-      - PGDATA=/var/lib/postgresql/data/pgdata
-      
-    volumes:
-      - postgres_data:/var/lib/postgresql/data/pgdata
-      - ./postgres-init:/docker-entrypoint-initdb.d
-    
-    # Health check PostgreSQL (selon doc officielle)
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-n8n_user} -d ${POSTGRES_DB:-n8n}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    
-    # Configuration PostgreSQL optimisée pour n8n
-    command: >
-      postgres
-      -c max_connections=100
-      -c shared_buffers=128MB
-      -c effective_cache_size=256MB
-      -c maintenance_work_mem=64MB
-      -c checkpoint_completion_target=0.9
-      -c wal_buffers=16MB
-      -c default_statistics_target=100
-      -c random_page_cost=1.1
-      -c effective_io_concurrency=200
-      -c work_mem=4MB
-      -c min_wal_size=1GB
-      -c max_wal_size=2GB
-      -c log_min_duration_statement=1000
-      -c log_checkpoints=on
-      -c log_connections=on
-      -c log_disconnections=on
-      -c log_lock_waits=on
-    
+    # RÉSEAU
     networks:
       - n8n_network
 
-  # Service de backup automatique (optionnel)
-  backup:
-    image: postgres:17-alpine
-    container_name: n8n_backup
+  # ==========================================================================
+  # 🚀 SERVICE 4: REDIS - Queue pour haute performance (2024/2025)
+  # ==========================================================================
+  #
+  # Redis permet :
+  # - Queue des workflows pour haute performance
+  # - Exécution asynchrone des tâches
+  # - Scalabilité horizontale avec workers
+  # - Gestion des pics de charge
+  #
+  redis:
+    # IMAGE Redis Alpine (légère et rapide)
+    image: redis:7-alpine
+    
+    # NOM du conteneur
+    container_name: n8n_redis
+    
+    # Redémarrage automatique
     restart: unless-stopped
-    profiles:
-      - backup
     
-    environment:
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - PGHOST=postgres
-      - BACKUP_SCHEDULE=${BACKUP_SCHEDULE:-0 2 * * *}
-      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-7}
+    # COMMANDE avec persistance des données
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     
+    # VOLUMES pour persistance Redis
     volumes:
-      - ./backups:/backups
-      - ./scripts/backup.sh:/backup.sh:ro
+      - redis_data:/data
     
-    command: >
-      sh -c '
-        echo "Backup service démarré"
-        while true; do
-          echo "Backup en cours à $$(date)"
-          pg_dump -h postgres -U $$POSTGRES_USER -d $$POSTGRES_DB > /backups/n8n_backup_$$(date +%Y%m%d_%H%M%S).sql
-          
-          # Nettoyer les anciens backups
-          find /backups -name "*.sql" -type f -mtime +$$BACKUP_RETENTION_DAYS -delete
-          
-          echo "Prochain backup dans 24h"
-          sleep 86400
-        done
-      '
+    # RESOURCE LIMITS pour Redis
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
     
+    # HEALTHCHECK Redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    
+    # RÉSEAU
+    networks:
+      - n8n_network
+
+  # ==========================================================================
+  # ⚡ SERVICE 5: N8N WORKER - Scalabilité horizontale (2024/2025)
+  # ==========================================================================
+  #
+  # Le Worker n8n permet :
+  # - Traitement parallèle des workflows
+  # - Scalabilité horizontale (plusieurs workers)
+  # - Répartition de la charge
+  # - Performance maximale
+  #
+  n8n-worker:
+    # MÊME IMAGE que n8n principal
+    image: docker.n8n.io/n8nio/n8n:latest
+    
+    # NOM du conteneur worker
+    container_name: n8n_worker_1
+    
+    # Redémarrage automatique
+    restart: unless-stopped
+    
+    # COMMANDE = Lance en mode worker
+    command: n8n worker
+    
+    # VARIABLES D'ENVIRONNEMENT = Configuration identique à n8n principal
+    environment:
+      # === CONFIGURATION IDENTIQUE AU MAIN ===
+      - NODE_ENV=production
+      - GENERIC_TIMEZONE=${TIMEZONE}
+      - TZ=${TIMEZONE}
+      
+      # === BASE DE DONNÉES (même config) ===
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+      - DB_POSTGRESDB_USER=${POSTGRES_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      
+      # === REDIS QUEUE (même config) ===
+      - EXECUTIONS_MODE=queue
+      - QUEUE_BULL_REDIS_HOST=redis
+      - QUEUE_BULL_REDIS_PORT=6379
+      
+      # === ENCRYPTION (même clé) ===
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      
+      # === LOGGING WORKER ===
+      - N8N_LOG_LEVEL=info
+      - N8N_LOG_OUTPUT=console
+    
+    # VOLUMES = Stockage partagé
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./files:/files
+    
+    # RESOURCE LIMITS pour le Worker
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'        # Max 1 CPU core par worker
+          memory: 1G         # Max 1GB RAM par worker
+        reservations:
+          cpus: '0.25'       # Reserve 0.25 CPU
+          memory: 256M       # Reserve 256MB RAM
+    
+    # DEPENDS_ON = Worker démarre après que tout soit prêt
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+      n8n:
+        condition: service_healthy  # Attend que n8n principal soit prêt
     
+    # HEALTHCHECK Worker
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep 'n8n worker' | grep -v grep || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    # RÉSEAU
     networks:
       - n8n_network
 
-# Volumes Docker gérés (recommandé pour Windows)
+  # ==========================================================================
+  # 🌐 SERVICE 6: CLOUDFLARE TUNNEL - Accès HTTPS depuis Internet
+  # ==========================================================================
+  #
+  # Cloudflare Tunnel permet :
+  # - D'exposer votre n8n sur Internet avec HTTPS automatique
+  # - Pas besoin d'ouvrir de ports sur votre routeur
+  # - Protection DDoS gratuite de Cloudflare
+  # - Certificat SSL automatique
+  #
+  # ⚠️  PRÉREQUIS : Vous devez avoir :
+  # 1. Un domaine configuré sur Cloudflare
+  # 2. Un tunnel créé sur Cloudflare Dashboard
+  # 3. Le token du tunnel
+  #
+  cloudflared:
+    # IMAGE officielle de Cloudflare
+    image: cloudflare/cloudflared:latest
+    
+    # NOM du conteneur
+    container_name: n8n_cloudflared
+    
+    # Redémarrage automatique
+    restart: unless-stopped
+    
+    # COMMANDE = Lance le tunnel avec le token
+    command: tunnel --no-autoupdate run
+    
+    # VARIABLES D'ENVIRONNEMENT
+    environment:
+      # TOKEN du tunnel Cloudflare depuis le fichier .env
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    
+    # DEPENDS_ON = Le tunnel ne démarre que si n8n fonctionne
+    depends_on:
+      n8n:
+        condition: service_healthy
+    
+    # HEALTHCHECK = Vérifier que le tunnel fonctionne
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep cloudflared | grep -v grep || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    
+    # RÉSEAU
+    networks:
+      - n8n_network
+
+# =============================================================================
+# 💾 VOLUMES - Stockage persistant des données
+# =============================================================================
+#
+# Les volumes permettent de sauvegarder les données même si on supprime les conteneurs
+# Format: nom_du_volume: configuration
+#
 volumes:
+  # Volume pour les données PostgreSQL (base de données)
+  postgres_data:
+    driver: local  # Stockage local sur votre PC
+    name: n8n_postgres_data  # Nom explicite du volume
+  
+  # Volume pour les données n8n (workflows, paramètres, fichiers)
   n8n_data:
     driver: local
-    name: n8n_data
+    name: n8n_app_data
   
-  postgres_data:
+  # Volume pour les logs n8n (2024/2025)
+  n8n_logs:
     driver: local
-    name: postgres_data
+    name: n8n_logs_data
+  
+  # Volume pour les données Redis (queue)
+  redis_data:
+    driver: local
+    name: n8n_redis_data
 
-# Réseau isolé
+# =============================================================================
+# 🌐 NETWORKS - Communication entre conteneurs
+# =============================================================================
+#
+# Le réseau permet aux conteneurs de communiquer entre eux
+# Par exemple: n8n peut parler à postgres via le nom "postgres"
+#
 networks:
   n8n_network:
-    driver: bridge
-    name: n8n_network
+    driver: bridge  # Type de réseau (bridge = réseau interne Docker)
+    name: n8n_network  # Nom explicite du réseau

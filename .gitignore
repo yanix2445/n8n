@@ -1,23 +1,60 @@
-# Fichiers sensibles
-.env
+# =============================================================================
+# 🔐 GITIGNORE - Protection des fichiers sensibles
+# =============================================================================
+#
+# Ce fichier empêche de commiter accidentellement des informations sensibles
+#
+
+# === FICHIERS SECRETS (TRÈS IMPORTANT) ===
+.env                    # Mots de passe, tokens, clés de chiffrement
 .env.local
 .env.production
+.env.backup
+*.env
 
-# Données
-volumes/
-backups/
-local_files/
-
-# Logs
-*.log
+# === LOGS ET DONNÉES ===
 logs/
+*.log
+n8n_data/
+postgres_data/
+redis_data/
+backups/
+*.sql
+*.tar.gz
 
-# Certificats
+# === FICHIERS TEMPORAIRES ===
+.DS_Store
+Thumbs.db
+*.tmp
+*.temp
+.vscode/
+.idea/
+
+# === CERTIFICATS ET CLÉS ===
 *.pem
 *.key
 *.crt
+*.p12
+*.pfx
+credentials/
 
-# Temporaires
-.DS_Store
-Thumbs.db
-desktop.ini
+# === VOLUMES DOCKER LOCAUX ===
+volumes/
+data/
+
+# === FICHIERS DE DÉVELOPPEMENT ===
+debug.log
+test-results/
+coverage/
+
+# === FICHIERS SYSTÈME ===
+.git/
+node_modules/
+npm-debug.log*
+
+# =============================================================================
+# ⚠️  RAPPEL SÉCURITÉ :
+# - Ne commitez JAMAIS le fichier .env
+# - Gardez vos tokens Cloudflare secrets
+# - Sauvegardez votre clé N8N_ENCRYPTION_KEY en lieu sûr
+# =============================================================================
