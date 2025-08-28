@@ -372,9 +372,8 @@ services:
       retries: 3
       start_period: 30s
     
-    # RÉSEAU
-    networks:
-      - n8n_network
+    # RÉSEAU = Utilise le réseau de l'hôte pour accéder à localhost
+    network_mode: host
 
 # =============================================================================
 # 💾 VOLUMES - Stockage persistant des données
