@@ -5,7 +5,7 @@
 # Ce fichier empêche de commiter accidentellement des informations sensibles
 #
 
-# === FICHIERS SECRETS (TRÈS IMPORTANT) ===
+# === FICHIERS SECRETS (TRÈS IMPORTANT) ==
 .env                    # Mots de passe, tokens, clés de chiffrement
 .env.local
 .env.production
