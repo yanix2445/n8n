@@ -10,7 +10,7 @@
 .env.local
 .env.production
 .env.backup
-*.env
+
 
 # === LOGS ET DONNÉES ===
 logs/
